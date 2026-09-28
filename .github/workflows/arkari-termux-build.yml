@@ -108,8 +108,18 @@ jobs:
         run: |
           cmake --build build-android --target clang -j "$(nproc)"
 
-      - name: Install
-        run: cmake --install build-android
+      - name: Install (manual copy, skip broken install rules)
+        run: |
+          mkdir -p install/bin install/lib
+          # clang binaries and symlinks (clang, clang-23, clang++, clang-cpp)
+          cp -a build-android/bin/clang* install/bin/
+          # builtin headers resource dir (lib/clang/<ver>/include)
+          cp -a build-android/lib/clang install/lib/
+          echo "=== bin ==="
+          ls -la install/bin/
+          echo "=== lib/clang ==="
+          ls -la install/lib/clang/*/ 2>/dev/null
+          ls -la install/lib/clang/*/include 2>/dev/null | head
 
       - name: Package tarball
         run: |
