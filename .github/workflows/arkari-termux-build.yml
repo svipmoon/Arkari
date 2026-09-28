@@ -1,0 +1,124 @@
+name: Build Arkari ARM64 (Android/Termux)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ llvm-23.x ]
+    paths:
+      - '.github/workflows/arkari-termux-build.yml'
+      - 'llvm/lib/Transforms/Obfuscation/**'
+
+env:
+  NDK_VERSION: r30
+
+jobs:
+  build:
+    name: Cross-compile clang+lld for aarch64-linux-android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Free disk space (remove unused LLVM subprojects)
+        run: |
+          rm -rf flang mlir polly lldb bolt clang-tools-extra compiler-rt runtimes \
+                 libc libcxx libcxxabi libunwind openmp offload libclc pstl cross-project-tests \
+                 || true
+          df -h
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build cmake python3 unzip zip xz-utils file
+
+      - name: Download & extract Android NDK (toolchain only)
+        run: |
+          cd "${{ runner.temp }}"
+          curl -fL -o ndk.zip "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"
+          unzip -q ndk.zip "android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/*" \
+            "android-ndk-${NDK_VERSION}/build/cmake/*" \
+            "android-ndk-${NDK_VERSION}/source.properties"
+          rm -f ndk.zip
+          echo "NDK_PATH=${{ runner.temp }}/android-ndk-${NDK_VERSION}" >> "$GITHUB_ENV"
+          ls "${{ runner.temp }}/android-ndk-${NDK_VERSION}/toolchains/llvm/prebuilt/"
+
+      - name: Build host tools (llvm-tblgen / clang-tblgen)
+        run: |
+          cmake -S llvm -B build-host -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_TARGETS_TO_BUILD=AArch64 \
+            -DLLVM_ENABLE_PROJECTS=clang \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_LIBXML2=OFF \
+            -DLLVM_ENABLE_LIBEDIT=OFF \
+            -DLLVM_ENABLE_LIBPFM=OFF \
+            -DLLVM_ENABLE_BINDINGS=OFF \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_INCLUDE_DOCS=OFF
+          cmake --build build-host --target llvm-tblgen clang-tblgen llvm-config -j "$(nproc)"
+
+      - name: Configure cross build (aarch64-linux-android / Termux bionic)
+        run: |
+          cmake -S llvm -B build-android -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DANDROID_STL=c++_static \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install" \
+            -DLLVM_TARGETS_TO_BUILD=AArch64 \
+            -DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-linux-android24 \
+            -DLLVM_ENABLE_PROJECTS="clang;lld" \
+            -DLLVM_ENABLE_LIBCXX=ON \
+            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/build-host/bin/llvm-tblgen" \
+            -DCLANG_TABLEGEN="$GITHUB_WORKSPACE/build-host/bin/clang-tblgen" \
+            -DLLVM_NATIVE_TOOL_DIR="$GITHUB_WORKSPACE/build-host/bin" \
+            -DLLVM_USE_HOST_TOOLS=ON \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_LIBXML2=OFF \
+            -DLLVM_ENABLE_LIBEDIT=OFF \
+            -DLLVM_ENABLE_LIBPFM=OFF \
+            -DLLVM_ENABLE_BINDINGS=OFF \
+            -DLLVM_ENABLE_THREADS=ON \
+            -DLLVM_ENABLE_ASSERTIONS=OFF \
+            -DLLVM_BUILD_TOOLS=ON \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_INCLUDE_DOCS=OFF \
+            -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
+            -DCLANG_TIDY_ENABLE_STATIC_ANALYZER=OFF \
+            -DCLANG_VENDOR="Arkari" \
+            -DCLANG_DEFAULT_LINKER=lld \
+            -DDEFAULT_SYSROOT="/data/data/com.termux/files" \
+            -DC_INCLUDE_DIRS="/data/data/com.termux/files/usr/include"
+
+      - name: Build clang and lld
+        run: |
+          cmake --build build-android --target clang lld -j "$(nproc)"
+
+      - name: Install
+        run: cmake --install build-android
+
+      - name: Package tarball
+        run: |
+          cd install
+          tar -cJf "$GITHUB_WORKSPACE/arkari-aarch64-android.tar.xz" bin lib
+          cd ..
+          ls -lh arkari-aarch64-android.tar.xz
+          file install/bin/clang install/bin/ld.lld 2>/dev/null || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkari-aarch64-android
+          path: arkari-aarch64-android.tar.xz
+          retention-days: 90
