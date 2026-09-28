@@ -24,8 +24,11 @@ jobs:
 
       - name: Free disk space (remove unused LLVM subprojects)
         run: |
-          rm -rf flang mlir polly lldb bolt clang-tools-extra compiler-rt runtimes \
-                 libc libcxx libcxxabi libunwind openmp offload libclc pstl cross-project-tests \
+          # NOTE: keep 'libc' dir - LLVM 23's FindLibcCommonUtils.cmake REQUIRES it to exist
+          rm -rf flang mlir polly lldb bolt clang-tools-extra \
+                 compiler-rt runtimes libcxx libcxxabi libunwind \
+                 openmp offload libclc pstl cross-project-tests \
+                 orc-rt flang-rt llvm-libgcc libsycl \
                  || true
           df -h
 
