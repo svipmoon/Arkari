@@ -118,31 +118,7 @@ jobs:
           find . -maxdepth 3 -type f | head -40
           echo "=== clang resource dir ==="
           ls -la lib/clang/*/include 2>/dev/null | head
-          cat > README-Termux.txt <<'EOF'
-Arkari LLVM/Clang for ARM64 Android (Termux)
-============================================
-Built from: svipmoon/Arkari (llvm-23.x) with Arkari obfuscation passes.
-Target: aarch64-linux-android24 (bionic), linked statically with libc++, works on Termux.
-
-Install:
-  pkg install lld binutils file
-  mkdir -p $PREFIX/opt/arkari
-  tar -xJf arkari-aarch64-android.tar.xz -C $PREFIX/opt/arkari
-  chmod +x $PREFIX/opt/arkari/bin/*
-  export PATH=$PREFIX/opt/arkari/bin:$PATH
-
-Compile a C script with obfuscation:
-  clang -mllvm -irobf-indbr -mllvm -irobf-icall -mllvm -irobf-indgv test.c -o test
-  # full passes: -mllvm -irobf (see Arkari README for -mllvm -irobf-* flags)
-  # link with the system lld if clang can not find a linker:
-  clang -fuse-ld=lld -mllvm -irobf-indbr test.c -o test
-
-Notes:
-  - Default sysroot is set to /data/data/com.termux/files so headers/libs are found
-    automatically (Termux standard install prefix).
-  - If your Termux prefix differs, add: -I$PREFIX/include -L$PREFIX/lib
-  - clang is the Arkari obfuscating compiler; use its -mllvm -irobf-* options.
-EOF
+          echo "QXJrYXJpIExMVk0vQ2xhbmcgZm9yIEFSTTY0IEFuZHJvaWQgKFRlcm11eCkKPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KQnVpbHQgZnJvbTogc3ZpcG1vb24vQXJrYXJpIChsbHZtLTIzLngpIHdpdGggQXJrYXJpIG9iZnVzY2F0aW9uIHBhc3Nlcy4KVGFyZ2V0OiBhYXJjaDY0LWxpbnV4LWFuZHJvaWQyNCAoYmlvbmljKSwgbGlua2VkIHN0YXRpY2FsbHkgd2l0aCBsaWJjKyssIHdvcmtzIG9uIFRlcm11eC4KCkluc3RhbGw6CiAgcGtnIGluc3RhbGwgbGxkIGJpbnV0aWxzIGZpbGUKICBta2RpciAtcCAkUFJFRklYL29wdC9hcmthcmkKICB0YXIgLXhKZiBhcmthcmktYWFyY2g2NC1hbmRyb2lkLnRhci54eiAtQyAkUFJFRklYL29wdC9hcmthcmkKICBjaG1vZCAreCAkUFJFRklYL29wdC9hcmthcmkvYmluLyoKICBleHBvcnQgUEFUSD0kUFJFRklYL29wdC9hcmthcmkvYmluOiRQQVRICgpDb21waWxlIGEgQyBzY3JpcHQgd2l0aCBvYmZ1c2NhdGlvbjoKICBjbGFuZyAtbWxsdm0gLWlyb2JmLWluZGJyIC1tbGx2bSAtaXJvYmYtaWNhbGwgLW1sbHZtIC1pcm9iZi1pbmRndiB0ZXN0LmMgLW8gdGVzdAogICMgZnVsbCBwYXNzZXM6IC1tbGx2bSAtaXJvYmYgKHNlZSBBcmthcmkgUkVBRE1FIGZvciAtbWxsdm0gLWlyb2JmLSogZmxhZ3MpCiAgIyBsaW5rIHdpdGggdGhlIHN5c3RlbSBsbGQgaWYgY2xhbmcgY2FuIG5vdCBmaW5kIGEgbGlua2VyOgogIGNsYW5nIC1mdXNlLWxkPWxsZCAtbWxsdm0gLWlyb2JmLWluZGJyIHRlc3QuYyAtbyB0ZXN0CgpOb3RlczoKICAtIERlZmF1bHQgc3lzcm9vdCBpcyBzZXQgdG8gL2RhdGEvZGF0YS9jb20udGVybXV4L2ZpbGVzIHNvIGhlYWRlcnMvbGlicyBhcmUgZm91bmQKICAgIGF1dG9tYXRpY2FsbHkgKFRlcm11eCBzdGFuZGFyZCBpbnN0YWxsIHByZWZpeCkuCiAgLSBJZiB5b3VyIFRlcm11eCBwcmVmaXggZGlmZmVycywgYWRkOiAtSSRQUkVGSVgvaW5jbHVkZSAtTCRQUkVGSVgvbGliCiAgLSBjbGFuZyBpcyB0aGUgQXJrYXJpIG9iZnVzY2F0aW5nIGNvbXBpbGVyOyB1c2UgaXRzIC1tbGx2bSAtaXJvYmYtKiBvcHRpb25zLgo=" | base64 -d > README-Termux.txt
           tar -cJf "$GITHUB_WORKSPACE/arkari-aarch64-android.tar.xz" bin lib README-Termux.txt
           cd ..
           ls -lh arkari-aarch64-android.tar.xz
