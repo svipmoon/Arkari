@@ -77,7 +77,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install" \
             -DLLVM_TARGETS_TO_BUILD=AArch64 \
             -DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-linux-android24 \
-            -DLLVM_ENABLE_PROJECTS="clang;lld" \
+            -DLLVM_ENABLE_PROJECTS="clang" \
             -DLLVM_ENABLE_LIBCXX=ON \
             -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/build-host/bin/llvm-tblgen" \
             -DCLANG_TABLEGEN="$GITHUB_WORKSPACE/build-host/bin/clang-tblgen" \
@@ -104,9 +104,9 @@ jobs:
             -DDEFAULT_SYSROOT="/data/data/com.termux/files" \
             -DC_INCLUDE_DIRS="/data/data/com.termux/files/usr/include"
 
-      - name: Build clang and lld
+      - name: Build clang
         run: |
-          cmake --build build-android --target clang lld -j "$(nproc)"
+          cmake --build build-android --target clang -j "$(nproc)"
 
       - name: Install
         run: cmake --install build-android
@@ -114,10 +114,42 @@ jobs:
       - name: Package tarball
         run: |
           cd install
-          tar -cJf "$GITHUB_WORKSPACE/arkari-aarch64-android.tar.xz" bin lib
+          echo "=== install tree ==="
+          find . -maxdepth 3 -type f | head -40
+          echo "=== clang resource dir ==="
+          ls -la lib/clang/*/include 2>/dev/null | head
+          cat > README-Termux.txt <<'EOF'
+Arkari LLVM/Clang for ARM64 Android (Termux)
+============================================
+Built from: svipmoon/Arkari (llvm-23.x) with Arkari obfuscation passes.
+Target: aarch64-linux-android24 (bionic), linked statically with libc++, works on Termux.
+
+Install:
+  pkg install lld binutils file
+  mkdir -p $PREFIX/opt/arkari
+  tar -xJf arkari-aarch64-android.tar.xz -C $PREFIX/opt/arkari
+  chmod +x $PREFIX/opt/arkari/bin/*
+  export PATH=$PREFIX/opt/arkari/bin:$PATH
+
+Compile a C script with obfuscation:
+  clang -mllvm -irobf-indbr -mllvm -irobf-icall -mllvm -irobf-indgv test.c -o test
+  # full passes: -mllvm -irobf (see Arkari README for -mllvm -irobf-* flags)
+  # link with the system lld if clang can not find a linker:
+  clang -fuse-ld=lld -mllvm -irobf-indbr test.c -o test
+
+Notes:
+  - Default sysroot is set to /data/data/com.termux/files so headers/libs are found
+    automatically (Termux standard install prefix).
+  - If your Termux prefix differs, add: -I$PREFIX/include -L$PREFIX/lib
+  - clang is the Arkari obfuscating compiler; use its -mllvm -irobf-* options.
+EOF
+          tar -cJf "$GITHUB_WORKSPACE/arkari-aarch64-android.tar.xz" bin lib README-Termux.txt
           cd ..
           ls -lh arkari-aarch64-android.tar.xz
-          file install/bin/clang install/bin/ld.lld 2>/dev/null || true
+          echo "=== binary info ==="
+          file install/bin/clang* 2>/dev/null || true
+          echo "=== readelf check (should be aarch64) ==="
+          readelf -h install/bin/clang 2>/dev/null | grep -E 'Class|Machine' || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
